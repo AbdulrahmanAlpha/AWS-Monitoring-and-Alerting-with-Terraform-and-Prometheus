@@ -1,197 +1,158 @@
-## Introduction
-In this project, we will be setting up a monitoring and alerting system on AWS using Terraform and Prometheus. We will create an EC2 instance to host Prometheus, install Prometheus on the instance, and configure Prometheus to collect metrics from our AWS infrastructure. We will also set up alerts in Prometheus to notify us when certain conditions are met, such as high CPU usage.
+# ⚙️ AWS Monitoring and Alerting with Terraform & Prometheus
 
-## Prerequisites
+This project provisions a Prometheus-based monitoring setup on AWS using **Terraform**. It deploys an EC2 instance, installs Prometheus, and sets up basic alerting rules, enabling you to monitor infrastructure metrics, such as CPU usage, in real-time.
 
-Before we get started, you will need to have the following:
+---
 
-- An AWS account
-- An AWS access key and secret key with appropriate permissions to create resources
-- Terraform installed on your local machine
-- An SSH key pair for accessing the EC2 instance
+## 📌 Features
 
-## Step 1: Create an EC2 instance
+✅ Provision EC2 instance with Prometheus installed  
+✅ Open security group access to Prometheus UI (port 9090) and SSH (port 22)  
+✅ Install Prometheus via `remote-exec` and custom shell script  
+✅ Prometheus auto-discovers EC2 instances using `ec2_sd_configs`  
+✅ Custom alert rules (e.g., high CPU usage)  
+✅ Infrastructure as Code with **Terraform**
 
-The first step is to create an EC2 instance to host Prometheus. We will use Terraform to create the instance. 
+---
 
-1. Create a new directory for the project.
-
-```
-mkdir prometheus-aws
-cd prometheus-aws
-```
-
-2. Create a new file named `main.tf` in the directory and add the following code:
-
-```terraform
-provider "aws" {
-  region = "us-west-2"
-}
-
-resource "aws_security_group" "prometheus" {
-  name_prefix = "prometheus-"
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    from_port   = 9090
-    to_port     = 9090
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-resource "aws_security_group" "ssh_access" {
-  name_prefix = "prometheus-ssh-"
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-resource "aws_instance" "prometheus" {
-  ami           = "ami-0c55b159cbfafe1f0"
-  instance_type = "t2.micro"
-  key_name      = "my-keypair"
-  security_groups = [
-    aws_security_group.prometheus.name,
-    aws_security_group.ssh_access.name,
-  ]
-
-  tags = {
-    Name = "prometheus-instance"
-  }
-
-  connection {
-    type        = "ssh"
-    user        = "ubuntu"
-    private_key = file("~/.ssh/my-keypair.pem")
-    host        = self.public_ip
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "wget https://github.com/prometheus/prometheus/releases/download/v2.33.1/prometheus-2.33.1.linux-amd64.tar.gz",
-      "tar xfz prometheus-2.33.1.linux-amd64.tar.gz",
-      "cd prometheus-2.33.1.linux-amd64/",
-      "./prometheus --config.file=prometheus.yml &",
-    ]
-  }
-}
-```
-
-3. Replace the `region`, `ami`, `key_name`, and `private_key` values with your own values.
-
-4. Run `terraform init` to initialize the project.
-
-5. Run `terraform apply` to create the EC2 instance. This will take a few minutes.
-
-## Step 2: Install Prometheus
-
-Now that we have an EC2 instance, we can install Prometheus on it. We will use SSH to connect to the instance and run the installation commands.
-
-1. Connect to the EC2 instance using SSH.
+## 🧱 Architecture Overview
 
 ```
-ssh -i ~/.ssh/my-keypair.pem ubuntu@<instance-public-ip>
+
++------------------------------+
+\|      AWS EC2 Instance       |
+\|    Ubuntu + Prometheus      |
+\|  ────────────────           |
+\|  🔸 Prometheus UI (9090)     |
+\|  🔸 Prometheus.yml config    |
+\|  🔸 Alerts.rules             |
++------------------------------+
+
+```
+    ↓ Terraform
 ```
 
-2. Once you're connected, run the following commands to install Prometheus:
++------------------------------+
+\|   AWS Infrastructure Setup   |
+\|  - EC2 + Security Groups     |
+\|  - Key Pair for SSH          |
+\|  - User Data Provisioning    |
++------------------------------+
+
+````
+
+---
+
+## 🧾 Files Overview
+
+| File                          | Description                                   |
+|-------------------------------|-----------------------------------------------|
+| `main.tf`                    | Terraform config for EC2 + Security Groups     |
+| `prometheus-installation.sh` | Bash script to download & run Prometheus       |
+| `prometheus.yml`             | Prometheus config: scrape targets, alerts      |
+| `alerts.rules`               | Prometheus alert rules (e.g., High CPU usage)   |
+
+---
+
+## 🧰 Prerequisites
+
+- AWS account with Access Key / Secret Key
+- Terraform ≥ 1.0.0
+- SSH Key pair created in AWS (`my-keypair.pem`)
+- Security group rules allow ports `22` and `9090`
+- Replace access credentials in `prometheus.yml` (or use IAM roles in production)
+
+---
+
+## 🚀 How to Deploy
+
+### 1. Update Configuration
+
+Make sure to update:
+- `access_key` and `secret_key` in `prometheus.yml`  
+- Key pair name in `main.tf`  
+- Path to your `.pem` file in `main.tf`
+
+---
+
+### 2. Initialize Terraform
+
+```bash
+terraform init
+````
+
+---
+
+### 3. Plan and Apply
+
+```bash
+terraform plan
+terraform apply
+```
+
+---
+
+### 4. Access Prometheus UI
+
+Once the EC2 instance is deployed, visit:
 
 ```
-wget https://github.com/prometheus/prometheus/releases/download/v2.33.1/prometheus-2.33.1.linux-amd64.tar.gz
-tar xfz prometheus-2.33.1.linux-amd64.tar.gz
-cd prometheus-2.33.1.linux-amd64/
-./prometheus --config.file=prometheus.yml &
+http://<EC2-PUBLIC-IP>:9090
 ```
 
-This will download and extract the Prometheus binaries, and start Prometheus using the default configuration file.
+You can find the EC2 IP in the Terraform output or AWS Console.
 
-## Step 3: Configure Prometheus to collect metrics
+---
 
-Now that Prometheus is installed, we need to configure it tocollect metrics from our AWS infrastructure. We will use AWS CloudWatch as a data source for metrics.
-
-1. In the AWS Management Console, navigate to CloudWatch and select "Metrics" from the left-hand menu.
-
-2. Select the metrics you want to collect, such as CPU usage and network traffic, and choose "Create Alarm".
-
-3. Configure the alarm to trigger when the metric exceeds a certain threshold, such as when CPU usage is above 80%.
-
-4. In the "Actions" section, choose "Send notification to" and select an SNS topic to receive the alert.
-
-5. Save the alarm and repeat for any additional metrics you want to monitor.
-
-6. In the Prometheus configuration file (`prometheus.yml`), add the CloudWatch endpoint as a target for metrics scraping:
-
-```yaml
-scrape_configs:
-  - job_name: 'cloudwatch'
-    scrape_interval: 15s
-    metrics_path: '/cloudwatch'
-    static_configs:
-      - targets: ['<cloudwatch-endpoint>']
-```
-
-Replace `<cloudwatch-endpoint>` with the endpoint URL for your CloudWatch instance.
-
-7. Restart Prometheus for the new configuration to take effect.
-
-## Step 4: Set up alerts in Prometheus
-
-Now that we have metrics being collected in Prometheus, we can set up alerts to notify us when certain conditions are met. We will use the Prometheus alerting rules to define the conditions for triggering an alert.
-
-1. In the Prometheus configuration file, add the alerting rules:
-
-```yaml
-rule_files:
-  - /etc/prometheus/alert.rules
-
-alerting:
-  alertmanagers:
-  - static_configs:
-    - targets:
-      - localhost:9093
-```
-
-2. Create a new file named `alert.rules` in the `/etc/prometheus` directory and add the following rule:
+## 🔔 Example Alert Rule (CPU Usage)
 
 ```yaml
 groups:
-- name: example
-  rules:
-  - alert: HighCPUUsage
-    expr: node_cpu_seconds_total{mode="idle"} < 100
-    for: 1m
-    labels:
-      severity: critical
-    annotations:
-      summary: "High CPU usage detected"
-      description: "CPU usage is above 80% for 1 minute"
+  - name: cpu_alerts
+    rules:
+      - alert: HighCpuUsage
+        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "{{ $labels.instance }} has high CPU usage ({{ $value }}%)"
 ```
 
-This rule will trigger an alert when the CPU usage is above 80% for 1 minute.
+---
 
-3. Restart Prometheus for the new rules to take effect.
+## 🧪 How to Test
 
-4. Set up an alert manager to receive and handle alerts. You can use a tool like Alertmanager or PagerDuty for this.
+* Use `stress` command (install manually) to simulate high CPU:
 
-## Conclusion
+```bash
+sudo apt install stress
+stress --cpu 2 --timeout 300
+```
 
-Congratulations! You have now set up a monitoring and alerting system on AWS using Terraform and Prometheus. You can now monitor your AWS infrastructure and receive alerts when problems arise. This system can be extended by adding more metrics, rules, and integrations to fit your use case.
+* Check the Prometheus Alerts tab to verify the `HighCpuUsage` alert triggers.
+
+---
+
+## 📦 Cleaning Up
+
+```bash
+terraform destroy
+```
+
+---
+
+## 🙋‍♂️ Author
+
+Made with ❤️ by **Abdulrahman A. Muhamad**
+🔗 GitHub: [@AbdulrahmanAlpha](https://github.com/AbdulrahmanAlpha)
+🔗 LinkedIn: [/in/abdulrahmanalpha](https://linkedin.com/in/abdulrahmanalpha)
+
+---
+
+## 📚 Resources
+
+* [Prometheus Docs](https://prometheus.io/docs/introduction/overview/)
+* [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
+* [EC2 SD Config in Prometheus](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#ec2_sd_config)
