@@ -28,9 +28,9 @@ This project provisions a Prometheus-based monitoring setup on AWS using **Terra
 \|  🔸 Alerts.rules             |
 +------------------------------+
 
-```
+
     ↓ Terraform
-```
+
 
 +------------------------------+
 \|   AWS Infrastructure Setup   |
